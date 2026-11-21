@@ -1,0 +1,85 @@
+
+# ==========================================
+# Miscellaneous / OS
+# ==========================================
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# IDE
+# ==========================================
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Keep VS Code settings if needed
+# .vscode/
+
+# ==========================================
+# Flutter / Dart / Pub
+# ==========================================
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+
+.flutter-plugins
+.flutter-plugins-dependencies
+
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# ==========================================
+# Flutter / Build artifacts
+# ==========================================
+.build/
+.buildlog/
+.widget_preview/
+migrate_working_dir/
+
+# ==========================================
+# Android / Gradle
+# ==========================================
+android/.gradle/
+android/local.properties
+android/captures/
+
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ==========================================
+# Signing keys - NEVER COMMIT
+# ==========================================
+android/key.properties
+*.jks
+*.keystore
+
+# ==========================================
+# Environment variables / Secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# Symbolication / Obfuscation
+# ==========================================
+app.*.symbols
+app.*.map.json
+
+# ==========================================
+# Other tools
+# ==========================================
+.atom/
+.history
+.svn/
+.swiftpm/
