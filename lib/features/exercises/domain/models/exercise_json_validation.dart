@@ -1,7 +1,12 @@
 class ExerciseValidationIssue {
-  const ExerciseValidationIssue({required this.path, required this.message});
+  const ExerciseValidationIssue({
+    required this.path,
+    required this.message,
+    this.code = 'invalid_exercise_json',
+  });
 
   final String path;
+  final String code;
   final String message;
 
   @override
