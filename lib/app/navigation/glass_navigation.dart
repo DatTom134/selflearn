@@ -236,6 +236,7 @@ class _NavigationItem extends StatelessWidget {
         ? scheme.primary
         : (semantic?.textSecondary ?? scheme.onSurfaceVariant);
     return Semantics(
+      key: ValueKey('navigation-destination-${destination.name}'),
       selected: selected,
       button: true,
       label: destination.label,

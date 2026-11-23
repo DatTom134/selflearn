@@ -8,7 +8,9 @@ import '../widgets/dashboard_action_card.dart';
 import '../widgets/dashboard_stat_card.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
-  const HomeDashboardScreen({super.key});
+  const HomeDashboardScreen({super.key, required this.onOpenExercises});
+
+  final VoidCallback onOpenExercises;
 
   @override
   Widget build(BuildContext context) {
@@ -135,8 +137,8 @@ class HomeDashboardScreen extends StatelessWidget {
                       icon: Icons.file_upload_outlined,
                       title: 'Nhập bộ đề',
                       description: 'Dán nội dung JSON hoặc chọn file để kiểm tra và xem trước.',
-                      actionLabel: 'Sắp ra mắt',
-                      onPressed: null,
+                      actionLabel: 'Mở kho đề',
+                      onPressed: onOpenExercises,
                     ),
                   ),
                 ],
