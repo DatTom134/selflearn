@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../features/home/presentation/screens/home_dashboard_screen.dart';
+import '../features/exercises/domain/repositories/exercise_repository.dart';
+import '../features/exercises/presentation/screens/exercise_library_screen.dart';
 import '../features/placeholder/presentation/placeholder_screen.dart';
 import 'navigation/app_destination.dart';
 import 'navigation/glass_navigation.dart';
@@ -10,9 +12,14 @@ import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
 class SelfLearnApp extends StatefulWidget {
-  const SelfLearnApp({super.key, required this.themeController});
+  const SelfLearnApp({
+    super.key,
+    required this.themeController,
+    required this.exerciseRepository,
+  });
 
   final ThemeController themeController;
+  final ExerciseRepository exerciseRepository;
 
   @override
   State<SelfLearnApp> createState() => _SelfLearnAppState();
@@ -50,15 +57,23 @@ class _SelfLearnAppState extends State<SelfLearnApp> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: widget.themeController.value,
-      home: AppShell(themeController: widget.themeController),
+      home: AppShell(
+        themeController: widget.themeController,
+        exerciseRepository: widget.exerciseRepository,
+      ),
     );
   }
 }
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.themeController});
+  const AppShell({
+    super.key,
+    required this.themeController,
+    required this.exerciseRepository,
+  });
 
   final ThemeController themeController;
+  final ExerciseRepository exerciseRepository;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -82,11 +97,15 @@ class _AppShellState extends State<AppShell> {
             width >= AppBreakpoints.expandedSidebarMinWidth;
         final isRail = !isPhone;
 
-        final page = _selectedIndex == 0
-            ? const HomeDashboardScreen()
-            : PlaceholderScreen(
-                destination: AppDestination.values[_selectedIndex],
-              );
+        final page = switch (_selectedIndex) {
+          0 => HomeDashboardScreen(
+            onOpenExercises: () => _selectDestination(1),
+          ),
+          1 => ExerciseLibraryScreen(repository: widget.exerciseRepository),
+          _ => PlaceholderScreen(
+            destination: AppDestination.values[_selectedIndex],
+          ),
+        };
 
         return Scaffold(
           body: SafeArea(
