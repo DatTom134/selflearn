@@ -22,6 +22,7 @@
 - Empty and unreadable clipboard inputs clear an earlier valid preview and keep Save disabled.
 - Dialog tests use stable keys and dismiss the simulated keyboard before tapping actions; assert no pending Flutter exception after critical transitions, including rename route dismissal.
 - SQLite and fake-repository tests cover literal wildcard/escape characters, case-insensitive topics, ordering, duplicate handling, rename and deletion.
+- Practice foundation tests cover exact question-type registration, atomic typed parsing, multiple-choice validation and option-index answer evaluation. Other types remain importable but are rejected by the Practice parser until explicitly supported.
 
 ## Required local quality gate
 

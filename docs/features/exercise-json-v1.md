@@ -19,12 +19,14 @@ This is the first executable Exercise JSON contract used by the Exercise Library
 | Field | Required | Type | Rules |
 |---|---|---|---|
 | `id` | No | string | If supplied, non-empty and unique within the set |
-| `type` | Yes | string | Non-empty type identifier; type registry can expand without changing the root contract |
-| `prompt` or `question` | Yes | string | Non-empty question text |
-| `answer` or `answers` | Yes | JSON value | Must not be null |
-| `options` | Conditional | array | For a type containing `multiple`, at least two choices; a string answer must match one option |
+| `type` | Yes | string | Non-empty type identifier. Import accepts other identifiers with the common fields below; Practice support is determined separately by its exact-match registry |
+| `prompt` or `question` | Yes | string | Non-empty question text. For `multiple_choice`, if both aliases are present they must match after trimming |
+| `answer` or `answers` | Yes | JSON value | Must not be null for generic question types. `multiple_choice` requires one string `answer` and does not allow `answers` |
+| `options` | Conditional | array | Required for exact type `multiple_choice`: at least two non-empty strings, unique after trimming (case-sensitive); its trimmed `answer` must exactly match a trimmed option |
 
-The validator deliberately keeps answer payloads as JSON values so question types can add structured answers without flattening them. More detailed per-type validation belongs with the future Practice feature once the supported question-type registry is finalized.
+The validator preserves generic answer payloads as JSON values so other question types can use structured answers without flattening them. It applies the single-choice contract only when a question's `type` is exactly `multiple_choice`; identifiers such as `multiple_select` remain eligible for generic Exercise import but are not supported by Practice.
+
+For `multiple_choice`, options and answer are trimmed only for validation and Practice domain models. Comparisons are case-sensitive; Unicode and punctuation are not normalized. The source JSON remains unchanged.
 
 ## Example
 

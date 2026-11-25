@@ -19,6 +19,7 @@ class ExerciseJsonValidator {
       return ExerciseJsonValidationResult.invalid([
         const ExerciseValidationIssue(
           path: r'$',
+          code: 'input_too_large',
           message: 'Tệp vượt quá giới hạn 2 MB.',
         ),
       ]);
@@ -27,6 +28,7 @@ class ExerciseJsonValidator {
       return ExerciseJsonValidationResult.invalid([
         const ExerciseValidationIssue(
           path: r'$',
+          code: 'empty_input',
           message: 'Nội dung JSON đang trống.',
         ),
       ]);
@@ -39,6 +41,7 @@ class ExerciseJsonValidator {
       return ExerciseJsonValidationResult.invalid([
         ExerciseValidationIssue(
           path: r'$',
+          code: 'invalid_json_syntax',
           message: 'Sai cú pháp JSON: ${error.message}',
         ),
       ]);
@@ -48,6 +51,7 @@ class ExerciseJsonValidator {
       return ExerciseJsonValidationResult.invalid([
         const ExerciseValidationIssue(
           path: r'$',
+          code: 'invalid_root',
           message: 'Phần tử gốc phải là một JSON object.',
         ),
       ]);
@@ -59,6 +63,7 @@ class ExerciseJsonValidator {
       issues.add(
         const ExerciseValidationIssue(
           path: r'$.schemaVersion',
+          code: 'invalid_schema_version',
           message: 'Bắt buộc là số nguyên phiên bản schema.',
         ),
       );
@@ -66,6 +71,7 @@ class ExerciseJsonValidator {
       issues.add(
         ExerciseValidationIssue(
           path: r'$.schemaVersion',
+          code: 'unsupported_schema_version',
           message:
               'Phiên bản $schemaVersion chưa được hỗ trợ. Hiện hỗ trợ v$supportedSchemaVersion.',
         ),
@@ -277,22 +283,18 @@ class ExerciseJsonValidator {
         continue;
       }
       final type = _requiredString(item['type'], '$path.type', issues);
-      final promptValue = item['prompt'] ?? item['question'];
-      final prompt = _requiredString(promptValue, '$path.prompt', issues);
-      if (!item.containsKey('answer') && !item.containsKey('answers')) {
-        issues.add(
-          ExerciseValidationIssue(
-            path: '$path.answer',
-            message: 'Thiếu đáp án (answer hoặc answers).',
-          ),
-        );
-      } else if (item['answer'] == null && item['answers'] == null) {
-        issues.add(
-          ExerciseValidationIssue(
-            path: '$path.answer',
-            message: 'Đáp án không được null.',
-          ),
-        );
+      final isMultipleChoice = item['type'] == 'multiple_choice';
+      final prompt = isMultipleChoice
+          ? _readMultipleChoicePrompt(item, path, issues)
+          : _requiredString(
+              item['prompt'] ?? item['question'],
+              '$path.prompt',
+              issues,
+            );
+      if (isMultipleChoice) {
+        _validateMultipleChoice(item, path, issues);
+      } else {
+        _validateGenericAnswer(item, path, issues);
       }
       final id = item['id'];
       if (id != null) {
@@ -312,40 +314,189 @@ class ExerciseJsonValidator {
           );
         }
       }
-      if (type != null && type.toLowerCase().contains('multiple')) {
-        final options = item['options'];
-        if (options is! List || options.length < 2) {
-          issues.add(
-            ExerciseValidationIssue(
-              path: '$path.options',
-              message: 'Câu hỏi trắc nghiệm cần ít nhất hai lựa chọn.',
-            ),
-          );
-        } else {
-          final answer = item['answer'];
-          if (options.any(
-            (option) => option is! String || option.trim().isEmpty,
-          )) {
-            issues.add(
-              ExerciseValidationIssue(
-                path: '$path.options',
-                message: 'Mỗi lựa chọn phải là chuỗi không được để trống.',
-              ),
-            );
-          }
-          if (answer is String && !options.contains(answer)) {
-            issues.add(
-              ExerciseValidationIssue(
-                path: '$path.answer',
-                message: 'Đáp án không nằm trong danh sách options.',
-              ),
-            );
-          }
-        }
-      }
       if (type != null && prompt != null) questions.add(item);
     }
     return questions.isEmpty ? null : questions;
+  }
+
+  String? _readMultipleChoicePrompt(
+    Map<String, dynamic> item,
+    String path,
+    List<ExerciseValidationIssue> issues,
+  ) {
+    if (item.containsKey('prompt') && item.containsKey('question')) {
+      final prompt = _requiredString(item['prompt'], '$path.prompt', issues);
+      final question = _requiredString(
+        item['question'],
+        '$path.question',
+        issues,
+      );
+      if (prompt != null && question != null && prompt != question) {
+        issues.add(
+          ExerciseValidationIssue(
+            path: '$path.question',
+            code: 'conflicting_prompt_aliases',
+            message: 'prompt và question phải giống nhau sau khi trim.',
+          ),
+        );
+      }
+      return prompt;
+    }
+
+    return _requiredString(
+      item['prompt'] ?? item['question'],
+      '$path.prompt',
+      issues,
+    );
+  }
+
+  void _validateGenericAnswer(
+    Map<String, dynamic> item,
+    String path,
+    List<ExerciseValidationIssue> issues,
+  ) {
+    if (!item.containsKey('answer') && !item.containsKey('answers')) {
+      issues.add(
+        ExerciseValidationIssue(
+          path: '$path.answer',
+          message: 'Thiếu đáp án (answer hoặc answers).',
+        ),
+      );
+    } else if (item['answer'] == null && item['answers'] == null) {
+      issues.add(
+        ExerciseValidationIssue(
+          path: '$path.answer',
+          message: 'Đáp án không được null.',
+        ),
+      );
+    }
+  }
+
+  void _validateMultipleChoice(
+    Map<String, dynamic> item,
+    String path,
+    List<ExerciseValidationIssue> issues,
+  ) {
+    final optionsValue = item['options'];
+    final normalizedOptions = <String>[];
+    final seenOptions = <String>{};
+    var optionsAreValid = true;
+
+    if (optionsValue is! List) {
+      optionsAreValid = false;
+      issues.add(
+        ExerciseValidationIssue(
+          path: '$path.options',
+          code: 'invalid_options',
+          message: 'options phải là danh sách các chuỗi.',
+        ),
+      );
+    } else {
+      if (optionsValue.length < 2) {
+        optionsAreValid = false;
+        issues.add(
+          ExerciseValidationIssue(
+            path: '$path.options',
+            code: 'invalid_options',
+            message: 'Câu hỏi trắc nghiệm cần ít nhất hai lựa chọn.',
+          ),
+        );
+      }
+      for (var index = 0; index < optionsValue.length; index++) {
+        final option = optionsValue[index];
+        final optionPath = '$path.options[$index]';
+        if (option is! String) {
+          optionsAreValid = false;
+          issues.add(
+            ExerciseValidationIssue(
+              path: optionPath,
+              code: 'invalid_options',
+              message: 'Mỗi lựa chọn phải là chuỗi.',
+            ),
+          );
+          continue;
+        }
+        final normalized = option.trim();
+        if (normalized.isEmpty) {
+          optionsAreValid = false;
+          issues.add(
+            ExerciseValidationIssue(
+              path: optionPath,
+              code: 'invalid_options',
+              message: 'Mỗi lựa chọn không được để trống.',
+            ),
+          );
+          continue;
+        }
+        if (!seenOptions.add(normalized)) {
+          optionsAreValid = false;
+          issues.add(
+            ExerciseValidationIssue(
+              path: optionPath,
+              code: 'duplicate_option',
+              message: 'Các lựa chọn không được trùng nhau sau khi trim.',
+            ),
+          );
+          continue;
+        }
+        normalizedOptions.add(normalized);
+      }
+    }
+
+    if (item.containsKey('answers')) {
+      issues.add(
+        ExerciseValidationIssue(
+          path: '$path.answers',
+          code: 'answers_not_supported',
+          message: 'multiple_choice chỉ hỗ trợ một trường answer.',
+        ),
+      );
+    }
+
+    if (!item.containsKey('answer')) {
+      issues.add(
+        ExerciseValidationIssue(
+          path: '$path.answer',
+          code: 'answer_required',
+          message: 'Câu hỏi multiple_choice bắt buộc có answer.',
+        ),
+      );
+      return;
+    }
+
+    final answerValue = item['answer'];
+    if (answerValue is! String) {
+      issues.add(
+        ExerciseValidationIssue(
+          path: '$path.answer',
+          code: 'invalid_answer',
+          message: 'answer phải là một chuỗi.',
+        ),
+      );
+      return;
+    }
+
+    final answer = answerValue.trim();
+    if (answer.isEmpty) {
+      issues.add(
+        ExerciseValidationIssue(
+          path: '$path.answer',
+          code: 'invalid_answer',
+          message: 'answer không được để trống.',
+        ),
+      );
+      return;
+    }
+
+    if (optionsAreValid && !normalizedOptions.contains(answer)) {
+      issues.add(
+        ExerciseValidationIssue(
+          path: '$path.answer',
+          code: 'answer_not_in_options',
+          message: 'Đáp án không nằm trong danh sách options.',
+        ),
+      );
+    }
   }
 
   Object? _canonicalize(Object? value) {

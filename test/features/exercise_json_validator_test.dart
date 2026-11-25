@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:selflearn/features/exercises/domain/services/exercise_json_validator.dart';
 
@@ -85,6 +87,186 @@ void main() {
       ),
       isTrue,
     );
+  });
+
+  group('multiple_choice contract', () {
+    test('rejects a question without a type', () {
+      final question = _validMultipleChoiceQuestion()..remove('type');
+      final result = validator.validate(_exerciseFor(question));
+
+      expect(result.isValid, isFalse);
+      expect(
+        result.issues.any((issue) => issue.path == r'$.questions[0].type'),
+        isTrue,
+      );
+    });
+
+    test('accepts trimmed prompt aliases and answer-option matching', () {
+      final result = validator.validate(
+        _exerciseFor({
+          'type': 'multiple_choice',
+          'prompt': '  Chọn đáp án  ',
+          'question': 'Chọn đáp án',
+          'options': ['  Xin chào ', 'Tạm biệt'],
+          'answer': ' Xin chào ',
+        }),
+      );
+
+      expect(result.isValid, isTrue);
+      expect(result.issues, isEmpty);
+    });
+
+    test('accepts the question alias when prompt is absent', () {
+      final result = validator.validate(
+        _exerciseFor({
+          'type': 'multiple_choice',
+          'question': '  Chọn đáp án  ',
+          'options': ['Xin chào', 'Tạm biệt'],
+          'answer': 'Xin chào',
+        }),
+      );
+
+      expect(result.isValid, isTrue);
+      expect(result.issues, isEmpty);
+    });
+
+    test('rejects conflicting prompt aliases', () {
+      final result = validator.validate(
+        _exerciseFor({
+          'type': 'multiple_choice',
+          'prompt': 'Prompt A',
+          'question': 'Prompt B',
+          'options': ['A', 'B'],
+          'answer': 'A',
+        }),
+      );
+
+      expect(
+        result.issues.any(
+          (issue) => issue.code == 'conflicting_prompt_aliases',
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not apply multiple-choice rules to other type identifiers', () {
+      for (final type in [
+        'short_answer',
+        'multiple_select',
+        'Multiple_Choice',
+        ' multiple_choice ',
+      ]) {
+        final result = validator.validate(
+          _exerciseFor({'type': type, 'prompt': 'Question', 'answer': 'A'}),
+        );
+
+        expect(result.isValid, isTrue, reason: type);
+      }
+    });
+
+    final invalidCases = <String, (Map<String, dynamic>, String)>{
+      'missing options': (() {
+        final question = _validMultipleChoiceQuestion();
+        question.remove('options');
+        return (question, 'invalid_options');
+      })(),
+      'options not an array': (
+        {..._validMultipleChoiceQuestion(), 'options': 'A, B'},
+        'invalid_options',
+      ),
+      'fewer than two options': (
+        {
+          ..._validMultipleChoiceQuestion(),
+          'options': ['A'],
+        },
+        'invalid_options',
+      ),
+      'non-string option': (
+        {
+          ..._validMultipleChoiceQuestion(),
+          'options': ['A', 2],
+        },
+        'invalid_options',
+      ),
+      'empty option': (
+        {
+          ..._validMultipleChoiceQuestion(),
+          'options': ['A', '  '],
+        },
+        'invalid_options',
+      ),
+      'duplicate option after trimming': (
+        {
+          ..._validMultipleChoiceQuestion(),
+          'options': ['A', ' A '],
+        },
+        'duplicate_option',
+      ),
+      'missing answer': (() {
+        final question = _validMultipleChoiceQuestion();
+        question.remove('answer');
+        return (question, 'answer_required');
+      })(),
+      'null answer': (
+        {..._validMultipleChoiceQuestion(), 'answer': null},
+        'invalid_answer',
+      ),
+      'non-string answer': (
+        {
+          ..._validMultipleChoiceQuestion(),
+          'answer': ['A'],
+        },
+        'invalid_answer',
+      ),
+      'answer with different case': (
+        {..._validMultipleChoiceQuestion(), 'answer': 'hello'},
+        'answer_not_in_options',
+      ),
+      'answer not in options': (
+        {..._validMultipleChoiceQuestion(), 'answer': 'C'},
+        'answer_not_in_options',
+      ),
+      'answers instead of answer': (() {
+        final question = _validMultipleChoiceQuestion();
+        question.remove('answer');
+        question['answers'] = ['A'];
+        return (question, 'answers_not_supported');
+      })(),
+      'answer and answers together': (
+        {
+          ..._validMultipleChoiceQuestion(),
+          'answers': ['A'],
+        },
+        'answers_not_supported',
+      ),
+    };
+
+    for (final entry in invalidCases.entries) {
+      test('rejects ${entry.key}', () {
+        final result = validator.validate(_exerciseFor(entry.value.$1));
+
+        expect(result.isValid, isFalse);
+        expect(
+          result.issues.any((issue) => issue.code == entry.value.$2),
+          isTrue,
+          reason: result.issues.map((issue) => issue.toString()).join('\n'),
+        );
+      });
+    }
+
+    test('does not report an answer mismatch when options are invalid', () {
+      final question = _validMultipleChoiceQuestion()..remove('options');
+      final result = validator.validate(_exerciseFor(question));
+
+      expect(
+        result.issues.any((issue) => issue.code == 'invalid_options'),
+        isTrue,
+      );
+      expect(
+        result.issues.any((issue) => issue.code == 'answer_not_in_options'),
+        isFalse,
+      );
+    });
   });
 
   test('collapses duplicate topics without changing their first spelling', () {
@@ -190,3 +372,17 @@ const _validJson = '''{
     {"id": "q2", "type": "short_answer", "prompt": "Say goodbye", "answer": "Goodbye"}
   ]
 }''';
+
+Map<String, dynamic> _validMultipleChoiceQuestion() => {
+  'type': 'multiple_choice',
+  'prompt': 'Choose one',
+  'options': ['A', 'B'],
+  'answer': 'A',
+};
+
+String _exerciseFor(Map<String, dynamic> question) => jsonEncode({
+  'schemaVersion': 1,
+  'title': 'Test exercise',
+  'topics': ['Testing'],
+  'questions': [question],
+});
